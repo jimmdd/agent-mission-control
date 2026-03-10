@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import { ActivityLog } from './ActivityLog';
 import { DeliverablesList } from './DeliverablesList';
 import { SessionsList } from './SessionsList';
-import { PlanningTab } from './PlanningTab';
+import { TriageChecklist } from './TriageChecklist';
 import { AgentModal } from './AgentModal';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
-type TabType = 'overview' | 'planning' | 'activity' | 'deliverables' | 'sessions';
+type TabType = 'overview' | 'triage' | 'activity' | 'deliverables' | 'sessions';
 
 interface TaskModalProps {
   task?: Task;
@@ -23,14 +22,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
   const { agents, addTask, updateTask, addEvent } = useMissionControl();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAgentModal, setShowAgentModal] = useState(false);
-  const [usePlanningMode, setUsePlanningMode] = useState(false);
-  // Auto-switch to planning tab if task is in planning status
-  const [activeTab, setActiveTab] = useState<TabType>(task?.status === 'planning' ? 'planning' : 'overview');
-
-  // Stable callback for when spec is locked - use window.location.reload() to refresh data
-  const handleSpecLocked = useCallback(() => {
-    window.location.reload();
-  }, []);
+  const [activeTab, setActiveTab] = useState<TabType>(task?.status === 'planning' ? 'triage' : 'overview');
 
   const [form, setForm] = useState({
     title: task?.title || '',
@@ -51,8 +43,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
 
       const payload = {
         ...form,
-        // If planning mode is enabled for new tasks, override status to 'planning'
-        status: (!task && usePlanningMode) ? 'planning' : form.status,
+        status: form.status,
         assigned_agent_id: form.assigned_agent_id || null,
         due_date: form.due_date || null,
         workspace_id: workspaceId || task?.workspace_id || 'default',
@@ -70,21 +61,6 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
         if (task) {
           updateTask(savedTask);
 
-          // Check if auto-dispatch should be triggered and execute it
-          if (shouldTriggerAutoDispatch(task.status, savedTask.status, savedTask.assigned_agent_id)) {
-            const result = await triggerAutoDispatch({
-              taskId: savedTask.id,
-              taskTitle: savedTask.title,
-              agentId: savedTask.assigned_agent_id,
-              agentName: savedTask.assigned_agent?.name || 'Unknown Agent',
-              workspaceId: savedTask.workspace_id
-            });
-
-            if (!result.success) {
-              console.error('Auto-dispatch failed:', result.error);
-            }
-          }
-
           onClose();
         } else {
           addTask(savedTask);
@@ -95,26 +71,6 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
             message: `New task: ${savedTask.title}`,
             created_at: new Date().toISOString(),
           });
-
-          // If planning mode is enabled, auto-generate questions and keep modal open
-          if (usePlanningMode) {
-            // Trigger question generation in background
-            fetch(`/api/tasks/${savedTask.id}/planning`, { method: 'POST' })
-              .then((res) => {
-                if (res.ok) {
-                  // Update our local task reference and switch to planning tab
-                  updateTask({ ...savedTask, status: 'planning' });
-                  setActiveTab('planning');
-                } else {
-                  return res.json().then((data) => {
-                    console.error('Failed to start planning:', data.error);
-                  });
-                }
-              })
-              .catch((error) => {
-                console.error('Failed to start planning:', error);
-              });
-          }
           onClose();
         }
       }
@@ -146,7 +102,7 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: null },
-    { id: 'planning' as TabType, label: 'Planning', icon: <ClipboardList className="w-4 h-4" /> },
+    { id: 'triage' as TabType, label: 'Triage', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'activity' as TabType, label: 'Activity', icon: <Activity className="w-4 h-4" /> },
     { id: 'deliverables' as TabType, label: 'Deliverables', icon: <Package className="w-4 h-4" /> },
     { id: 'sessions' as TabType, label: 'Sessions', icon: <Bot className="w-4 h-4" /> },
@@ -217,31 +173,6 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               placeholder="Add details..."
             />
           </div>
-
-          {/* Planning Mode Toggle - only for new tasks */}
-          {!task && (
-            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={usePlanningMode}
-                  onChange={(e) => setUsePlanningMode(e.target.checked)}
-                  className="w-4 h-4 mt-0.5 rounded border-mc-border"
-                />
-                <div>
-                  <span className="font-medium text-sm flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-mc-accent" />
-                    Enable Planning Mode
-                  </span>
-                  <p className="text-xs text-mc-text-secondary mt-1">
-                    Best for complex projects that need detailed requirements. 
-                    You&apos;ll answer a few questions to define scope, goals, and constraints 
-                    before work begins. Skip this for quick, straightforward tasks.
-                  </p>
-                </div>
-              </label>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             {/* Status */}
@@ -316,12 +247,8 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
             </form>
           )}
 
-          {/* Planning Tab */}
-          {activeTab === 'planning' && task && (
-            <PlanningTab
-              taskId={task.id}
-              onSpecLocked={handleSpecLocked}
-            />
+          {activeTab === 'triage' && task && (
+            <TriageChecklist taskId={task.id} />
           )}
 
           {/* Activity Tab */}

@@ -52,11 +52,13 @@ export async function GET() {
     }
 
     // Get all agents already imported from the gateway
-    const existingAgents = queryAll<Agent>(
-      `SELECT * FROM agents WHERE gateway_agent_id IS NOT NULL`
+    const existingAgents = queryAll<Pick<Agent, 'id' | 'description'>>(
+      `SELECT id, description FROM agents WHERE source = 'gateway'`
     );
     const importedGatewayIds = new Map(
-      existingAgents.map((a) => [a.gateway_agent_id, a.id])
+      existingAgents
+        .map((a) => [a.description?.match(/Imported from OpenClaw Gateway \((.+)\)/)?.[1], a.id] as const)
+        .filter((entry): entry is [string, string] => Boolean(entry[0]))
     );
 
     // Map gateway agents to our DiscoveredAgent type

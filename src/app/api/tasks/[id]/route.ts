@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { queryOne, run, queryAll } from '@/lib/db';
+import { queryOne, run } from '@/lib/db';
 import { broadcast } from '@/lib/events';
-import { getMissionControlUrl } from '@/lib/config';
 import { UpdateTaskSchema } from '@/lib/validation';
-import type { Task, UpdateTaskRequest, Agent, TaskDeliverable } from '@/lib/types';
+import type { Task, UpdateTaskRequest, Agent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -100,9 +99,6 @@ export async function PATCH(
       values.push(validatedData.due_date);
     }
 
-    // Track if we need to dispatch task
-    let shouldDispatch = false;
-
     // Auto-promote INBOX -> ASSIGNED when an agent is assigned and no explicit status was provided
     if (
       nextStatus === undefined &&
@@ -117,11 +113,6 @@ export async function PATCH(
     if (nextStatus !== undefined && nextStatus !== existing.status) {
       updates.push('status = ?');
       values.push(nextStatus);
-
-      // Auto-dispatch when moving to assigned
-      if (nextStatus === 'assigned' && existing.assigned_agent_id) {
-        shouldDispatch = true;
-      }
 
       // Log status change event
       const eventType = nextStatus === 'done' ? 'task_completed' : 'task_status_changed';
@@ -146,10 +137,6 @@ export async function PATCH(
             [uuidv4(), 'task_assigned', validatedData.assigned_agent_id, id, `"${existing.title}" assigned to ${agent.name}`, now]
           );
 
-          // Auto-dispatch if already in assigned status or being assigned now
-          if (existing.status === 'assigned' || nextStatus === 'assigned') {
-            shouldDispatch = true;
-          }
         }
       }
     }
@@ -186,18 +173,6 @@ export async function PATCH(
       });
     }
 
-    // Trigger auto-dispatch if needed
-    if (shouldDispatch) {
-      // Call dispatch endpoint asynchronously (don't wait for response)
-      const missionControlUrl = getMissionControlUrl();
-      fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Auto-dispatch failed:', err);
-      });
-    }
-
     return NextResponse.json(task);
   } catch (error) {
     console.error('Failed to update task:', error);
@@ -207,7 +182,7 @@ export async function PATCH(
 
 // DELETE /api/tasks/[id] - Delete a task
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -222,9 +197,6 @@ export async function DELETE(
     // Note: task_activities and task_deliverables have ON DELETE CASCADE
     run('DELETE FROM openclaw_sessions WHERE task_id = ?', [id]);
     run('DELETE FROM events WHERE task_id = ?', [id]);
-    // Conversations reference tasks - nullify or delete
-    run('UPDATE conversations SET task_id = NULL WHERE task_id = ?', [id]);
-
     // Now delete the task (cascades to task_activities and task_deliverables)
     run('DELETE FROM tasks WHERE id = ?', [id]);
 

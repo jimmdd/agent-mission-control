@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Plus, ChevronRight, GripVertical, ArrowRightLeft } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
-import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import type { Task, TaskStatus } from '@/lib/types';
 import { TaskModal } from './TaskModal';
 import { formatDistanceToNow } from 'date-fns';
@@ -54,20 +53,6 @@ export function MissionQueue({ workspaceId, mobileMode = false, isPortrait = tru
           message: `Task "${task.title}" moved to ${targetStatus}`,
           created_at: new Date().toISOString(),
         });
-
-        if (shouldTriggerAutoDispatch(task.status, targetStatus, task.assigned_agent_id)) {
-          const result = await triggerAutoDispatch({
-            taskId: task.id,
-            taskTitle: task.title,
-            agentId: task.assigned_agent_id,
-            agentName: task.assigned_agent?.name || 'Unknown Agent',
-            workspaceId: task.workspace_id,
-          });
-
-          if (!result.success) {
-            console.error('Auto-dispatch failed:', result.error);
-          }
-        }
       }
     } catch (error) {
       console.error('Failed to update task status:', error);

@@ -8,7 +8,6 @@ import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
 import { LiveFeed } from '@/components/LiveFeed';
-import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
@@ -283,8 +282,6 @@ export default function WorkspacePage() {
           </div>
         </nav>
       )}
-
-      <SSEDebugPanel />
     </div>
   );
 }

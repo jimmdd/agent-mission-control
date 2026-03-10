@@ -38,10 +38,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for conflicts (already imported)
-    const existingImports = queryAll<Agent>(
-      `SELECT * FROM agents WHERE gateway_agent_id IS NOT NULL`
+    const existingImports = queryAll<Pick<Agent, 'id' | 'description'>>(
+      `SELECT id, description FROM agents WHERE source = 'gateway'`
     );
-    const importedGatewayIds = new Set(existingImports.map((a) => a.gateway_agent_id));
+    const importedGatewayIds = new Set(
+      existingImports
+        .map((a) => a.description?.match(/Imported from OpenClaw Gateway \((.+)\)/)?.[1])
+        .filter((id): id is string => Boolean(id))
+    );
 
     const results: { imported: Agent[]; skipped: { gateway_agent_id: string; reason: string }[] } = {
       imported: [],
@@ -96,8 +100,8 @@ export async function POST(request: NextRequest) {
         ].join('\n');
 
         run(
-          `INSERT INTO agents (id, name, role, description, avatar_emoji, is_master, workspace_id, soul_md, user_md, agents_md, model, source, gateway_agent_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO agents (id, name, role, description, avatar_emoji, is_master, workspace_id, soul_md, user_md, agents_md, model, source, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             agentReq.name,
@@ -111,7 +115,6 @@ export async function POST(request: NextRequest) {
             agentsMd,
             agentReq.model || null,
             'gateway',
-            agentReq.gateway_agent_id,
             now,
             now,
           ]

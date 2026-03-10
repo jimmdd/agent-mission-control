@@ -18,12 +18,16 @@ const ActivityType = z.enum([
   'updated',
   'completed',
   'file_created',
-  'status_changed'
+  'status_changed',
+  'planning_questions',
+  'planning_answer',
+  'linear_comment'
 ]);
 
 const DeliverableType = z.enum(['file', 'url', 'artifact']);
 
-// Task validation schemas
+const TaskSource = z.enum(['manual', 'linear', 'hiveclaw']);
+
 export const CreateTaskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(500, 'Title must be 500 characters or less'),
   description: z.string().max(10000, 'Description must be 10000 characters or less').optional(),
@@ -34,6 +38,10 @@ export const CreateTaskSchema = z.object({
   business_id: z.string().optional(),
   workspace_id: z.string().optional(),
   due_date: z.string().optional().nullable(),
+  parent_task_id: z.string().uuid().optional().nullable(),
+  linear_issue_id: z.string().optional().nullable(),
+  linear_issue_url: z.string().url().optional().nullable(),
+  source: TaskSource.optional(),
 });
 
 export const UpdateTaskSchema = z.object({

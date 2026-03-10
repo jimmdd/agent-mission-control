@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, Settings, ChevronLeft, LayoutGrid } from 'lucide-react';
+import { Zap, Settings, ChevronLeft, LayoutGrid, RefreshCw, Check, AlertTriangle } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { format } from 'date-fns';
 import type { Workspace } from '@/lib/types';
@@ -42,6 +42,24 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
     return () => clearInterval(interval);
   }, []);
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+
+  const handleLinearSync = async () => {
+    if (syncStatus === 'syncing') return;
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch('/api/sync/linear', { method: 'POST' });
+      if (res.ok) {
+        setSyncStatus('success');
+      } else {
+        setSyncStatus('error');
+      }
+    } catch {
+      setSyncStatus('error');
+    }
+    setTimeout(() => setSyncStatus('idle'), 2500);
+  };
+
   const workingAgents = agents.filter((a) => a.status === 'working').length;
   const activeAgents = workingAgents + activeSubAgents;
   const tasksInQueue = tasks.filter((t) => t.status !== 'done' && t.status !== 'review').length;
@@ -68,9 +86,31 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
               </div>
             </div>
 
-            <button onClick={() => router.push('/settings')} className="min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary shrink-0" title="Settings">
-              <Settings className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={handleLinearSync}
+                disabled={syncStatus === 'syncing'}
+                className={`min-h-11 min-w-11 p-2 rounded transition-colors ${
+                  syncStatus === 'success'
+                    ? 'text-mc-accent-green'
+                    : syncStatus === 'error'
+                      ? 'text-mc-accent-red'
+                      : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
+                }`}
+                title="Sync Linear"
+              >
+                {syncStatus === 'success' ? (
+                  <Check className="w-5 h-5" />
+                ) : syncStatus === 'error' ? (
+                  <AlertTriangle className="w-5 h-5" />
+                ) : (
+                  <RefreshCw className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                )}
+              </button>
+              <button onClick={() => router.push('/settings')} className="min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary" title="Settings">
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 min-w-0">
@@ -150,6 +190,26 @@ export function Header({ workspace, isPortrait = true }: HeaderProps) {
               <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-mc-accent-green animate-pulse' : 'bg-mc-accent-red'}`} />
               {isOnline ? 'ONLINE' : 'OFFLINE'}
             </div>
+            <button
+              onClick={handleLinearSync}
+              disabled={syncStatus === 'syncing'}
+              className={`min-h-11 min-w-11 p-2 rounded transition-colors ${
+                syncStatus === 'success'
+                  ? 'text-mc-accent-green'
+                  : syncStatus === 'error'
+                    ? 'text-mc-accent-red'
+                    : 'text-mc-text-secondary hover:bg-mc-bg-tertiary'
+              }`}
+              title="Sync Linear"
+            >
+              {syncStatus === 'success' ? (
+                <Check className="w-5 h-5" />
+              ) : syncStatus === 'error' ? (
+                <AlertTriangle className="w-5 h-5" />
+              ) : (
+                <RefreshCw className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              )}
+            </button>
             <button onClick={() => router.push('/settings')} className="min-h-11 min-w-11 p-2 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary" title="Settings">
               <Settings className="w-5 h-5" />
             </button>

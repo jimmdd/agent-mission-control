@@ -6,10 +6,6 @@ export type TaskStatus = 'pending_dispatch' | 'planning' | 'inbox' | 'assigned' 
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
 
-export type MessageType = 'text' | 'system' | 'task_update' | 'file';
-
-export type ConversationType = 'direct' | 'group' | 'task';
-
 export type EventType =
   | 'task_created'
   | 'task_assigned'
@@ -36,8 +32,6 @@ export interface Agent {
   agents_md?: string;
   model?: string;
   source: AgentSource;
-  gateway_agent_id?: string;
-  session_key_prefix?: string;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +48,8 @@ export interface DiscoveredAgent {
   existing_agent_id?: string;
 }
 
+export type TaskSource = 'manual' | 'linear' | 'hiveclaw';
+
 export interface Task {
   id: string;
   title: string;
@@ -65,18 +61,21 @@ export interface Task {
   workspace_id: string;
   business_id: string;
   due_date?: string;
-  status_reason?: string;
+  parent_task_id?: string | null;
+  linear_issue_id?: string | null;
+  linear_issue_url?: string | null;
+  source: TaskSource;
   created_at: string;
   updated_at: string;
-  // Joined fields
   assigned_agent?: Agent;
   created_by_agent?: Agent;
+  children?: Task[];
 }
 
 export interface Conversation {
   id: string;
   title?: string;
-  type: ConversationType;
+  type: 'direct' | 'group' | 'task';
   task_id?: string;
   created_at: string;
   updated_at: string;
@@ -90,7 +89,7 @@ export interface Message {
   conversation_id: string;
   sender_agent_id?: string;
   content: string;
-  message_type: MessageType;
+  message_type: 'text' | 'system' | 'task_update' | 'file';
   metadata?: string;
   created_at: string;
   // Joined fields
@@ -159,7 +158,25 @@ export interface OpenClawSession {
   updated_at: string;
 }
 
-export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed';
+export interface TriageQuestion {
+  id: string;
+  question: string;
+  category: string;
+  question_type: string;
+  options: string[] | null;
+  answer: string | null;
+  answered_at: string | null;
+}
+
+export interface TriageState {
+  questions: TriageQuestion[];
+  triage_reasoning: string;
+  triage_repos: Array<{ project: string; repo: string }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ActivityType = 'spawned' | 'updated' | 'completed' | 'file_created' | 'status_changed' | 'planning_questions' | 'planning_answer' | 'linear_comment';
 
 export interface TaskActivity {
   id: string;
@@ -183,57 +200,6 @@ export interface TaskDeliverable {
   path?: string;
   description?: string;
   created_at: string;
-}
-
-// Planning types
-export type PlanningQuestionType = 'multiple_choice' | 'text' | 'yes_no';
-
-export type PlanningCategory = 
-  | 'goal'
-  | 'audience'
-  | 'scope'
-  | 'design'
-  | 'content'
-  | 'technical'
-  | 'timeline'
-  | 'constraints';
-
-export interface PlanningQuestionOption {
-  id: string;
-  label: string;
-}
-
-export interface PlanningQuestion {
-  id: string;
-  task_id: string;
-  category: PlanningCategory;
-  question: string;
-  question_type: PlanningQuestionType;
-  options?: PlanningQuestionOption[];
-  answer?: string;
-  answered_at?: string;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface PlanningSpec {
-  id: string;
-  task_id: string;
-  spec_markdown: string;
-  locked_at: string;
-  locked_by?: string;
-  created_at: string;
-}
-
-export interface PlanningState {
-  questions: PlanningQuestion[];
-  spec?: PlanningSpec;
-  progress: {
-    total: number;
-    answered: number;
-    percentage: number;
-  };
-  isLocked: boolean;
 }
 
 // API request/response types
@@ -261,6 +227,10 @@ export interface CreateTaskRequest {
   created_by_agent_id?: string;
   business_id?: string;
   due_date?: string;
+  parent_task_id?: string;
+  linear_issue_id?: string;
+  linear_issue_url?: string;
+  source?: TaskSource;
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -271,7 +241,7 @@ export interface SendMessageRequest {
   conversation_id: string;
   sender_agent_id: string;
   content: string;
-  message_type?: MessageType;
+  message_type?: 'text' | 'system' | 'task_update' | 'file';
   metadata?: string;
 }
 

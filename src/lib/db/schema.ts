@@ -36,8 +36,6 @@ CREATE TABLE IF NOT EXISTS agents (
   agents_md TEXT,
   model TEXT,
   source TEXT DEFAULT 'local',
-  gateway_agent_id TEXT,
-  session_key_prefix TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -54,68 +52,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   workspace_id TEXT DEFAULT 'default' REFERENCES workspaces(id),
   business_id TEXT DEFAULT 'default',
   due_date TEXT,
-  planning_session_key TEXT,
-  planning_messages TEXT,
-  planning_complete INTEGER DEFAULT 0,
-  planning_spec TEXT,
-  planning_agents TEXT,
-  planning_dispatch_error TEXT,
-  status_reason TEXT,
+  parent_task_id TEXT REFERENCES tasks(id),
+  linear_issue_id TEXT,
+  linear_issue_url TEXT,
+  source TEXT DEFAULT 'manual',
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
-);
-
--- Planning questions table
-CREATE TABLE IF NOT EXISTS planning_questions (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  category TEXT NOT NULL,
-  question TEXT NOT NULL,
-  question_type TEXT DEFAULT 'multiple_choice' CHECK (question_type IN ('multiple_choice', 'text', 'yes_no')),
-  options TEXT,
-  answer TEXT,
-  answered_at TEXT,
-  sort_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
--- Planning specs table (locked specifications)
-CREATE TABLE IF NOT EXISTS planning_specs (
-  id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
-  spec_markdown TEXT NOT NULL,
-  locked_at TEXT NOT NULL,
-  locked_by TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
-);
-
--- Conversations table (agent-to-agent or task-related)
-CREATE TABLE IF NOT EXISTS conversations (
-  id TEXT PRIMARY KEY,
-  title TEXT,
-  type TEXT DEFAULT 'direct' CHECK (type IN ('direct', 'group', 'task')),
-  task_id TEXT REFERENCES tasks(id),
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
-);
-
--- Conversation participants
-CREATE TABLE IF NOT EXISTS conversation_participants (
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
-  agent_id TEXT REFERENCES agents(id) ON DELETE CASCADE,
-  joined_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (conversation_id, agent_id)
-);
-
--- Messages table
-CREATE TABLE IF NOT EXISTS messages (
-  id TEXT PRIMARY KEY,
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
-  sender_agent_id TEXT REFERENCES agents(id),
-  content TEXT NOT NULL,
-  message_type TEXT DEFAULT 'text' CHECK (message_type IN ('text', 'system', 'task_update', 'file')),
-  metadata TEXT,
-  created_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Events table (for live feed)
@@ -178,11 +120,9 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
-CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
-CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
 `;
