@@ -168,8 +168,18 @@ export interface TriageQuestion {
   answered_at: string | null;
 }
 
+export interface TriageContextComment {
+  id: string;
+  author: string;
+  body: string;
+  source: 'linear' | 'manual';
+  linear_comment_id?: string;
+  created_at: string;
+}
+
 export interface TriageState {
   questions: TriageQuestion[];
+  context_comments: TriageContextComment[];
   triage_reasoning: string;
   triage_repos: Array<{ project: string; repo: string }>;
   created_at: string;

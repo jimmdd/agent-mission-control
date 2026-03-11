@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Circle, Loader2, RefreshCw, Send } from 'lucide-react';
+import { CheckCircle, Circle, Loader2, MessageSquare, RefreshCw, Send } from 'lucide-react';
 import type { TriageState } from '@/lib/types';
 
 interface TriageChecklistProps {
@@ -219,6 +219,31 @@ export function TriageChecklist({ taskId }: TriageChecklistProps) {
           </div>
         ))}
       </div>
+
+      {state.context_comments?.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-mc-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Linear Context ({state.context_comments.length})
+          </h4>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {state.context_comments.map((c) => (
+              <div
+                key={c.id}
+                className="rounded-lg border border-mc-border bg-mc-bg-tertiary p-3 text-sm"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-mc-accent-cyan text-xs">{c.author}</span>
+                  <span className="text-[10px] text-mc-text-secondary">
+                    {new Date(c.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-mc-text-secondary whitespace-pre-wrap text-xs leading-relaxed">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {allAnswered && (
         <button
